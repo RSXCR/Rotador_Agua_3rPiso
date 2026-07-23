@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotación Agua</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .turno-actual {
+            background: #e3f2fd;
+            border: 3px solid #2196f3;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .turno-actual p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .turno-actual .nombre {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2196f3;
+        }
+
+        .acciones {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-copiar {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-copiar:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-pagado {
+            background: #2196f3;
+            color: white;
+        }
+
+        .btn-pagado:hover {
+            background: #1976d2;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        .btn-teams {
+            background: #0078d4;
+            color: white;
+        }
+
+        .btn-teams:hover {
+            background: #005a9e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+        }
+
+        .lista {
+            margin-bottom: 30px;
+        }
+
+        .lista h3 {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .usuario-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-left: 4px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .usuario-item.activo {
+            background: #f5f5f5;
+            border-left-color: #999;
+        }
+
+        .usuario-item.activo.turno {
+            background: #e3f2fd;
+            border-left-color: #2196f3;
+            font-weight: bold;
+        }
+
+        .usuario-item.inactivo {
+            background: #f0f0f0;
+            color: #999;
+            border-left-color: #ccc;
+            text-decoration: line-through;
+        }
+
+        .posicion {
+            font-weight: bold;
+            color: #666;
+            min-width: 30px;
+        }
+
+        .nombre-usuario {
+            flex: 1;
+            margin-left: 12px;
+        }
+
+        .estado {
+            font-size: 12px;
+            color: #999;
+            font-weight: normal;
+        }
+
+        .btn-toggle {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-toggle:hover {
+            background: #f57c00;
+        }
+
+        .stats {
+            background: #fafafa;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .input-precio {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .turno-actual .nombre {
+                font-size: 24px;
+            }
+
+            .acciones {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💧 Rotación Agua</h1>
+
+        <!-- Turno actual -->
+        <div class="turno-actual">
+            <p>Siguiente a pagar:</p>
+            <div class="nombre" id="turnoNombre">Cargando...</div>
+        </div>
+
+        <!-- Precio -->
+        <input type="number" class="input-precio" id="inputPrecio" placeholder="Precio pagado (ej: 3500)" value="3500">
+
+        <!-- Acciones principales -->
+        <div class="acciones">
+            <button class="btn-copiar" onclick="copiarNombre()">👤 Copiar nombre</button>
+            <button class="btn-copiar btn-teams" onclick="abrirTeams()">🔵 Abrir Teams</button>
+        </div>
+
+        <!-- Acciones secundarias -->
+        <div class="acciones">
+            <button class="btn-copiar" onclick="copiarRecordatorio()">📋 Copiar recordatorio</button>
+            <button class="btn-pagado" onclick="marcarPagado()">✓ Marcar pagado</button>
+        </div>
+
+        <!-- Lista -->
+        <div class="lista">
+            <h3>Orden de rotación</h3>
+            <div id="listaUsuarios"></div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats">
+            Total: <span id="statsTotal">0</span> | Activos: <span id="statsActivos">0</span>
+        </div>
+    </div>
+
+    <script>
+        // Datos iniciales
+        const usuariosIniciales = [
+            'Susan', 'Rafa', 'Marco', 'Ronald', 'Natalia', 'Dani',
+            'Karen', 'Suyen', 'Steffan', 'Guido', 'Vera', 'Gaby'
+        ];
+
+        // Estructura: { nombre, activo, pagos: [{fecha, precio}] }
+        let usuarios = [];
+        let turnoActualIndex = 0;
+
+        function inicializar() {
+            const stored = localStorage.getItem('rotacion_usuarios');
+            if (stored) {
+                usuarios = JSON.parse(stored);
+                turnoActualIndex = parseInt(localStorage.getItem('rotacion_turno') || 0);
+            } else {
+                usuarios = usuariosIniciales.map(nombre => ({
+                    nombre,
+                    activo: true,
+                    pagos: []
+                }));
+                guardar();
+            }
+            render();
+        }
+
+        function guardar() {
+            localStorage.setItem('rotacion_usuarios', JSON.stringify(usuarios));
+            localStorage.setItem('rotacion_turno', turnoActualIndex.toString());
+        }
+
+        function getTurnoActual() {
+            let index = turnoActualIndex;
+            while (index < usuarios.length && !usuarios[index].activo) {
+                index++;
+            }
+            if (index >= usuarios.length) {
+                index = 0;
+                while (index < usuarios.length && !usuarios[index].activo) {
+                    index++;
+                }
+            }
+            return index < usuarios.length ? index : 0;
+        }
+
+        function copiarNombre() {
+            const turno = getTurnoActual();
+            const nombre = usuarios[turno].nombre;
+            navigator.clipboard.writeText(nombre).then(() => {
+                alert(`✓ "${nombre}" copiado`);
+            });
+        }
+
+        function abrirTeams() {
+            window.open('ms-teams://');
+        }
+
+        function copiarRecordatorio() {
+            const turno = getTurnoActual();
+            const nombre = usuarios[turno].nombre;
+            const precio = document.getElementById('inputPrecio').value || '3500';
+            const texto = `${nombre}, te toca comprar agua.\nSon ${precio} colones (o lo que cueste).\n¡Gracias!`;
+            
+            navigator.clipboard.writeText(texto).then(() => {
+                alert('✓ Recordatorio copiado al portapapeles');
+            });
+        }
+
+        function marcarPagado() {
+            const turno = getTurnoActual();
+            const precio = parseInt(document.getElementById('inputPrecio').value) || 3500;
+            const fecha = new Date().toLocaleDateString('es-CR');
+
+            usuarios[turno].pagos.push({ fecha, precio });
+            turnoActualIndex = turno + 1;
+            guardar();
+            render();
+
+            alert(`✓ ${usuarios[turno].nombre} marcado como pagado`);
+        }
+
+        function toggleActivo(index) {
+            usuarios[index].activo = !usuarios[index].activo;
+            guardar();
+            render();
+        }
+
+        function render() {
+            const turno = getTurnoActual();
+            document.getElementById('turnoNombre').textContent = usuarios[turno].nombre;
+
+            const listaHTML = usuarios.map((usuario, i) => {
+                const estado = usuario.activo ? 'activo' : 'inactivo';
+                const esTurno = i === turno ? 'turno' : '';
+                const labelActivo = usuario.activo ? '(Desactivar)' : '(Activar)';
+
+                return `
+                    <div class="usuario-item ${estado} ${esTurno}">
+                        <span class="posicion">${i + 1}.</span>
+                        <div class="nombre-usuario">
+                            ${usuario.nombre}
+                            ${!usuario.activo ? '<span class="estado"> inactivo</span>' : ''}
+                        </div>
+                        <button class="btn-toggle" onclick="toggleActivo(${i})">${labelActivo}</button>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('listaUsuarios').innerHTML = listaHTML;
+
+            const activos = usuarios.filter(u => u.activo).length;
+            document.getElementById('statsTotal').textContent = usuarios.length;
+            document.getElementById('statsActivos').textContent = activos;
+        }
+
+        inicializar();
+    </script>
+</body>
+</html>
