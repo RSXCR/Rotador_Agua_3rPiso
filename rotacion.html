@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rotación Agua</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -198,6 +199,27 @@
             margin-bottom: 15px;
         }
 
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196f3;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -221,156 +243,196 @@
     <div class="container">
         <h1>💧 Rotación Agua</h1>
 
-        <!-- Turno actual -->
-        <div class="turno-actual">
-            <p>Siguiente a pagar:</p>
-            <div class="nombre" id="turnoNombre">Cargando...</div>
-        </div>
-
-        <!-- Precio -->
-        <input type="number" class="input-precio" id="inputPrecio" placeholder="Precio pagado (ej: 3500)" value="3500">
-
-        <!-- Acciones principales -->
-        <div class="acciones">
-            <button class="btn-copiar" onclick="copiarNombre()">👤 Copiar nombre</button>
-            <button class="btn-copiar btn-teams" onclick="abrirTeams()">🔵 Abrir Teams</button>
-        </div>
-
-        <!-- Acciones secundarias -->
-        <div class="acciones">
-            <button class="btn-copiar" onclick="copiarRecordatorio()">📋 Copiar recordatorio</button>
-            <button class="btn-pagado" onclick="marcarPagado()">✓ Marcar pagado</button>
-        </div>
-
-        <!-- Lista -->
-        <div class="lista">
-            <h3>Orden de rotación</h3>
-            <div id="listaUsuarios"></div>
-        </div>
-
-        <!-- Stats -->
-        <div class="stats">
-            Total: <span id="statsTotal">0</span> | Activos: <span id="statsActivos">0</span>
+        <div id="contenido">
+            <div class="loading">
+                <div class="spinner"></div>
+                Cargando datos...
+            </div>
         </div>
     </div>
 
     <script>
-        // Datos iniciales
-        const usuariosIniciales = [
-            'Susan', 'Rafa', 'Marco', 'Ronald', 'Natalia', 'Dani',
-            'Karen', 'Suyen', 'Steffan', 'Guido', 'Vera', 'Gaby'
-        ];
+        // Credenciales Supabase
+        const SUPABASE_URL = 'https://jcwjdcxofzczmpzamcuc.supabase.co'
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd2pkY3hvZnpjem1wemFtY3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNTMzNDksImV4cCI6MjA5OTYyOTM0OX0.eekJCgUQaqHmwou6gXkwb4_wShLNE-32K_ZQtzI-FRw'
 
-        // Estructura: { nombre, activo, pagos: [{fecha, precio}] }
-        let usuarios = [];
-        let turnoActualIndex = 0;
+        const { createClient } = window.supabase
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-        function inicializar() {
-            const stored = localStorage.getItem('rotacion_usuarios');
-            if (stored) {
-                usuarios = JSON.parse(stored);
-                turnoActualIndex = parseInt(localStorage.getItem('rotacion_turno') || 0);
-            } else {
-                usuarios = usuariosIniciales.map(nombre => ({
-                    nombre,
-                    activo: true,
-                    pagos: []
-                }));
-                guardar();
+        let usuarios = []
+        let turnoIndex = 0
+
+        async function inicializar() {
+            try {
+                // Traer usuarios
+                const { data, error } = await supabase
+                    .from('usuarios')
+                    .select('*')
+                    .order('posicion', { ascending: true })
+
+                if (error) throw error
+
+                usuarios = data || []
+                encontrarTurno()
+                render()
+                
+                // Escuchar cambios en tiempo real
+                supabase
+                    .channel('usuarios')
+                    .on('postgres_changes', 
+                        { event: '*', schema: 'public', table: 'usuarios' },
+                        () => {
+                            console.log('Cambios detectados en usuarios')
+                            recargar()
+                        }
+                    )
+                    .subscribe()
+
+            } catch (err) {
+                console.error('Error:', err)
+                document.getElementById('contenido').innerHTML = 
+                    `<div class="loading" style="color: red;">Error cargando datos: ${err.message}</div>`
             }
-            render();
         }
 
-        function guardar() {
-            localStorage.setItem('rotacion_usuarios', JSON.stringify(usuarios));
-            localStorage.setItem('rotacion_turno', turnoActualIndex.toString());
+        function encontrarTurno() {
+            const siguiente = usuarios.find(u => u.activo)
+            if (siguiente) {
+                turnoIndex = usuarios.indexOf(siguiente)
+            }
         }
 
-        function getTurnoActual() {
-            let index = turnoActualIndex;
-            while (index < usuarios.length && !usuarios[index].activo) {
-                index++;
+        async function recargar() {
+            const { data, error } = await supabase
+                .from('usuarios')
+                .select('*')
+                .order('posicion', { ascending: true })
+
+            if (!error) {
+                usuarios = data || []
+                encontrarTurno()
+                render()
             }
-            if (index >= usuarios.length) {
-                index = 0;
-                while (index < usuarios.length && !usuarios[index].activo) {
-                    index++;
-                }
-            }
-            return index < usuarios.length ? index : 0;
         }
 
         function copiarNombre() {
-            const turno = getTurnoActual();
-            const nombre = usuarios[turno].nombre;
-            navigator.clipboard.writeText(nombre).then(() => {
-                alert(`✓ "${nombre}" copiado`);
-            });
+            const turno = usuarios[turnoIndex]
+            navigator.clipboard.writeText(turno.nombre).then(() => {
+                alert(`✓ "${turno.nombre}" copiado`)
+            })
         }
 
         function abrirTeams() {
-            window.open('ms-teams://');
+            window.open('ms-teams://')
         }
 
         function copiarRecordatorio() {
-            const turno = getTurnoActual();
-            const nombre = usuarios[turno].nombre;
-            const precio = document.getElementById('inputPrecio').value || '3500';
-            const texto = `${nombre}, te toca comprar agua.\nSon ${precio} colones (o lo que cueste).\n¡Gracias!`;
-            
+            const turno = usuarios[turnoIndex]
+            const precio = document.getElementById('inputPrecio').value || '3500'
+            const texto = `${turno.nombre}, te toca comprar agua.\nSon ${precio} colones (o lo que cueste).\n¡Gracias!`
             navigator.clipboard.writeText(texto).then(() => {
-                alert('✓ Recordatorio copiado al portapapeles');
-            });
+                alert('✓ Recordatorio copiado')
+            })
         }
 
-        function marcarPagado() {
-            const turno = getTurnoActual();
-            const precio = parseInt(document.getElementById('inputPrecio').value) || 3500;
-            const fecha = new Date().toLocaleDateString('es-CR');
+        async function marcarPagado() {
+            const turno = usuarios[turnoIndex]
+            const precio = parseInt(document.getElementById('inputPrecio').value) || 3500
 
-            usuarios[turno].pagos.push({ fecha, precio });
-            turnoActualIndex = turno + 1;
-            guardar();
-            render();
+            try {
+                // Insertar pago
+                const { error: errorPago } = await supabase
+                    .from('pagos')
+                    .insert([{
+                        usuario_id: turno.id,
+                        precio_pagado: precio,
+                        fecha_pago: new Date().toISOString()
+                    }])
 
-            alert(`✓ ${usuarios[turno].nombre} marcado como pagado`);
+                if (errorPago) throw errorPago
+
+                // Avanzar al siguiente
+                turnoIndex++
+                if (turnoIndex >= usuarios.length) {
+                    turnoIndex = 0
+                }
+
+                alert(`✓ ${turno.nombre} marcado como pagado`)
+                recargar()
+
+            } catch (err) {
+                alert('Error: ' + err.message)
+            }
         }
 
-        function toggleActivo(index) {
-            usuarios[index].activo = !usuarios[index].activo;
-            guardar();
-            render();
+        async function toggleActivo(index) {
+            try {
+                const usuario = usuarios[index]
+                const { error } = await supabase
+                    .from('usuarios')
+                    .update({ activo: !usuario.activo })
+                    .eq('id', usuario.id)
+
+                if (error) throw error
+                recargar()
+
+            } catch (err) {
+                alert('Error: ' + err.message)
+            }
         }
 
         function render() {
-            const turno = getTurnoActual();
-            document.getElementById('turnoNombre').textContent = usuarios[turno].nombre;
+            const turno = usuarios[turnoIndex]
 
             const listaHTML = usuarios.map((usuario, i) => {
-                const estado = usuario.activo ? 'activo' : 'inactivo';
-                const esTurno = i === turno ? 'turno' : '';
-                const labelActivo = usuario.activo ? '(Desactivar)' : '(Activar)';
+                const estado = usuario.activo ? 'activo' : 'inactivo'
+                const esTurno = i === turnoIndex ? 'turno' : ''
+                const labelActivo = usuario.activo ? '(Desactivar)' : '(Activar)'
 
                 return `
                     <div class="usuario-item ${estado} ${esTurno}">
-                        <span class="posicion">${i + 1}.</span>
+                        <span class="posicion">${usuario.posicion}.</span>
                         <div class="nombre-usuario">
                             ${usuario.nombre}
                             ${!usuario.activo ? '<span class="estado"> inactivo</span>' : ''}
                         </div>
                         <button class="btn-toggle" onclick="toggleActivo(${i})">${labelActivo}</button>
                     </div>
-                `;
-            }).join('');
+                `
+            }).join('')
 
-            document.getElementById('listaUsuarios').innerHTML = listaHTML;
+            const activos = usuarios.filter(u => u.activo).length
 
-            const activos = usuarios.filter(u => u.activo).length;
-            document.getElementById('statsTotal').textContent = usuarios.length;
-            document.getElementById('statsActivos').textContent = activos;
+            document.getElementById('contenido').innerHTML = `
+                <div class="turno-actual">
+                    <p>Siguiente a pagar:</p>
+                    <div class="nombre">${turno.nombre}</div>
+                </div>
+
+                <input type="number" class="input-precio" id="inputPrecio" placeholder="Precio pagado (ej: 3500)" value="3500">
+
+                <div class="acciones">
+                    <button class="btn-copiar" onclick="copiarNombre()">👤 Copiar nombre</button>
+                    <button class="btn-copiar btn-teams" onclick="abrirTeams()">🔵 Abrir Teams</button>
+                </div>
+
+                <div class="acciones">
+                    <button class="btn-copiar" onclick="copiarRecordatorio()">📋 Copiar recordatorio</button>
+                    <button class="btn-pagado" onclick="marcarPagado()">✓ Marcar pagado</button>
+                </div>
+
+                <div class="lista">
+                    <h3>Orden de rotación</h3>
+                    <div id="listaUsuarios">${listaHTML}</div>
+                </div>
+
+                <div class="stats">
+                    Total: ${usuarios.length} | Activos: ${activos}
+                </div>
+            `
         }
 
-        inicializar();
+        inicializar()
     </script>
 </body>
 </html>
