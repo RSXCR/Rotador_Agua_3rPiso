@@ -252,20 +252,17 @@
     </div>
 
     <script>
-        // Credenciales Supabase
         const SUPABASE_URL = 'https://jcwjdcxofzczmpzamcuc.supabase.co'
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impjd2pkY3hvZnpjem1wemFtY3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNTMzNDksImV4cCI6MjA5OTYyOTM0OX0.eekJCgUQaqHmwou6gXkwb4_wShLNE-32K_ZQtzI-FRw'
 
-        const { createClient } = window.supabase
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
 
         let usuarios = []
         let turnoIndex = 0
 
         async function inicializar() {
             try {
-                // Traer usuarios
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('usuarios')
                     .select('*')
                     .order('posicion', { ascending: true })
@@ -275,23 +272,11 @@
                 usuarios = data || []
                 encontrarTurno()
                 render()
-                
-                // Escuchar cambios en tiempo real
-                supabase
-                    .channel('usuarios')
-                    .on('postgres_changes', 
-                        { event: '*', schema: 'public', table: 'usuarios' },
-                        () => {
-                            console.log('Cambios detectados en usuarios')
-                            recargar()
-                        }
-                    )
-                    .subscribe()
 
             } catch (err) {
                 console.error('Error:', err)
                 document.getElementById('contenido').innerHTML = 
-                    `<div class="loading" style="color: red;">Error cargando datos: ${err.message}</div>`
+                    `<div class="loading" style="color: red;">Error: ${err.message}</div>`
             }
         }
 
@@ -303,7 +288,7 @@
         }
 
         async function recargar() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('usuarios')
                 .select('*')
                 .order('posicion', { ascending: true })
@@ -340,8 +325,7 @@
             const precio = parseInt(document.getElementById('inputPrecio').value) || 3500
 
             try {
-                // Insertar pago
-                const { error: errorPago } = await supabase
+                const { error: errorPago } = await supabaseClient
                     .from('pagos')
                     .insert([{
                         usuario_id: turno.id,
@@ -351,7 +335,6 @@
 
                 if (errorPago) throw errorPago
 
-                // Avanzar al siguiente
                 turnoIndex++
                 if (turnoIndex >= usuarios.length) {
                     turnoIndex = 0
@@ -368,7 +351,7 @@
         async function toggleActivo(index) {
             try {
                 const usuario = usuarios[index]
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('usuarios')
                     .update({ activo: !usuario.activo })
                     .eq('id', usuario.id)
