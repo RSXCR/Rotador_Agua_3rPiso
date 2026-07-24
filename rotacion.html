@@ -66,6 +66,16 @@
             margin-bottom: 15px;
         }
 
+        .acciones-solo {
+            margin-bottom: 15px;
+        }
+
+        .acciones-solo button {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+        }
+
         button {
             padding: 12px 16px;
             border: none;
@@ -434,13 +444,7 @@
 
                 <input type="number" class="input-precio" id="inputPrecio" placeholder="Precio pagado (ej: 3500)" value="3500">
 
-                <div class="acciones">
-                    <button class="btn-copiar" onclick="copiarNombre()">👤 Copiar nombre</button>
-                    <button class="btn-copiar btn-teams" onclick="abrirTeams()">🔵 Abrir Teams</button>
-                </div>
-
-                <div class="acciones">
-                    <button class="btn-copiar" onclick="copiarRecordatorio()">📋 Copiar recordatorio</button>
+                <div class="acciones-solo">
                     <button class="btn-pagado" onclick="marcarPagado()">✓ Marcar pagado</button>
                 </div>
 
