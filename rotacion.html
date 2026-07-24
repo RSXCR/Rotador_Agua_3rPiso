@@ -220,6 +220,14 @@
             100% { transform: rotate(360deg); }
         }
 
+        .ultimo-pago {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            margin-top: -20px;
+            margin-bottom: 20px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -259,19 +267,20 @@
 
         let usuarios = []
         let turnoIndex = 0
+        let ultimoPagoInfo = null
 
         async function inicializar() {
             try {
-                const { data, error } = await supabaseClient
-                    .from('usuarios')
-                    .select('*')
-                    .order('posicion', { ascending: true })
-
-                if (error) throw error
-
-                usuarios = data || []
-                encontrarTurno()
+                await cargarUsuarios()
+                await calcularTurno()
                 render()
+
+                // Escuchar cambios en tiempo real (para que se sincronice entre dispositivos)
+                supabaseClient
+                    .channel('cambios')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, () => recargarTodo())
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'pagos' }, () => recargarTodo())
+                    .subscribe()
 
             } catch (err) {
                 console.error('Error:', err)
@@ -280,24 +289,55 @@
             }
         }
 
-        function encontrarTurno() {
-            const siguiente = usuarios.find(u => u.activo)
-            if (siguiente) {
-                turnoIndex = usuarios.indexOf(siguiente)
-            }
-        }
-
-        async function recargar() {
+        async function cargarUsuarios() {
             const { data, error } = await supabaseClient
                 .from('usuarios')
                 .select('*')
                 .order('posicion', { ascending: true })
 
-            if (!error) {
-                usuarios = data || []
-                encontrarTurno()
-                render()
+            if (error) throw error
+            usuarios = data || []
+        }
+
+        // Deriva el turno actual a partir del ULTIMO PAGO registrado en Supabase.
+        // Esto es lo que permite que el turno se vea igual en cualquier dispositivo.
+        async function calcularTurno() {
+            const { data, error } = await supabaseClient
+                .from('pagos')
+                .select('usuario_id, fecha_pago')
+                .order('fecha_pago', { ascending: false })
+                .limit(1)
+
+            if (error) throw error
+
+            if (!data || data.length === 0) {
+                // Nadie ha pagado todavia: el turno es el primer activo de la lista
+                turnoIndex = usuarios.findIndex(u => u.activo)
+                if (turnoIndex === -1) turnoIndex = 0
+                ultimoPagoInfo = null
+                return
             }
+
+            ultimoPagoInfo = data[0]
+            const posicionUltimoPago = usuarios.findIndex(u => u.id === data[0].usuario_id)
+
+            let index = posicionUltimoPago + 1
+            if (index >= usuarios.length) index = 0
+
+            let vueltas = 0
+            while (!usuarios[index].activo && vueltas < usuarios.length) {
+                index++
+                if (index >= usuarios.length) index = 0
+                vueltas++
+            }
+
+            turnoIndex = index
+        }
+
+        async function recargarTodo() {
+            await cargarUsuarios()
+            await calcularTurno()
+            render()
         }
 
         function copiarNombre() {
@@ -335,23 +375,8 @@
 
                 if (errorPago) throw errorPago
 
-                turnoIndex++
-                if (turnoIndex >= usuarios.length) {
-                    turnoIndex = 0
-                }
-                
-                while (turnoIndex < usuarios.length && !usuarios[turnoIndex].activo) {
-                    turnoIndex++
-                }
-                if (turnoIndex >= usuarios.length) {
-                    turnoIndex = 0
-                    while (turnoIndex < usuarios.length && !usuarios[turnoIndex].activo) {
-                        turnoIndex++
-                    }
-                }
-
                 alert(`✓ ${turno.nombre} marcado como pagado`)
-                recargar()
+                await recargarTodo()
 
             } catch (err) {
                 alert('Error: ' + err.message)
@@ -367,7 +392,7 @@
                     .eq('id', usuario.id)
 
                 if (error) throw error
-                recargar()
+                await recargarTodo()
 
             } catch (err) {
                 alert('Error: ' + err.message)
@@ -396,11 +421,16 @@
 
             const activos = usuarios.filter(u => u.activo).length
 
+            const ultimoPagoHTML = ultimoPagoInfo
+                ? `<div class="ultimo-pago">Último pago registrado: ${new Date(ultimoPagoInfo.fecha_pago).toLocaleDateString('es-CR')}</div>`
+                : ''
+
             document.getElementById('contenido').innerHTML = `
                 <div class="turno-actual">
                     <p>Siguiente a pagar:</p>
                     <div class="nombre">${turno.nombre}</div>
                 </div>
+                ${ultimoPagoHTML}
 
                 <input type="number" class="input-precio" id="inputPrecio" placeholder="Precio pagado (ej: 3500)" value="3500">
 
